@@ -4,11 +4,7 @@ import { Capabilities } from '@/lib/browseros/capabilities'
 import { getHealthCheckUrl, getMcpServerUrl } from '@/lib/browseros/helpers'
 import { openSidePanel, toggleSidePanel } from '@/lib/browseros/toggleSidePanel'
 import { checkAndShowChangelog } from '@/lib/changelog/changelog-notifier'
-import {
-  setupLlmProvidersBackupToBrowserOS,
-  setupLlmProvidersSyncToBackend,
-  syncLlmProviders,
-} from '@/lib/llm-providers/storage'
+import { setupLlmProvidersBackupToBrowserOS } from '@/lib/llm-providers/storage'
 import { fetchMcpTools } from '@/lib/mcp/client'
 import {
   onRuntimeMessage,
@@ -18,10 +14,6 @@ import { onServerMessage } from '@/lib/messaging/server/serverMessages'
 import { onOpenSidePanelWithSearch } from '@/lib/messaging/sidepanel/openSidepanelWithSearch'
 import { authRedirectPathStorage } from '@/lib/onboarding/onboardingStorage'
 import { syncOnboardingProfile } from '@/lib/onboarding/syncOnboardingProfile'
-import {
-  setupScheduledJobsSyncToBackend,
-  syncScheduledJobs,
-} from '@/lib/schedules/syncSchedulesToBackend'
 import { searchActionsStorage } from '@/lib/search-actions/searchActionsStorage'
 import { selectedTextStorage } from '@/lib/selected-text/selectedTextStorage'
 import { stopAgentStorage } from '@/lib/stop-agent/stop-agent-storage'
@@ -42,12 +34,15 @@ const cleanupLegacyToolApprovalStorage = async () => {
 }
 
 export default defineBackground(() => {
-  chrome.sidePanel.setOptions({ enabled: false })
+  if (
+    typeof (chrome.sidePanel as Record<string, unknown>).browserosToggle ===
+    'function'
+  ) {
+    chrome.sidePanel.setOptions({ enabled: false })
+  }
 
   Capabilities.initialize().catch(() => null)
   setupLlmProvidersBackupToBrowserOS()
-  setupLlmProvidersSyncToBackend()
-  setupScheduledJobsSyncToBackend()
 
   scheduledJobRuns()
 
@@ -129,12 +124,6 @@ export default defineBackground(() => {
 
   sessionStorage.watch(async (newSession) => {
     if (newSession?.user?.id) {
-      try {
-        await syncLlmProviders()
-      } catch {}
-      try {
-        await syncScheduledJobs()
-      } catch {}
       try {
         await syncOnboardingProfile(newSession.user.id)
       } catch {}

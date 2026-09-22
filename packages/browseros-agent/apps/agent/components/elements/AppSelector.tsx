@@ -20,7 +20,6 @@ import {
 import { MANAGED_MCP_ADDED_EVENT } from '@/lib/constants/analyticsEvents'
 import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import { track } from '@/lib/metrics/track'
-import { sentry } from '@/lib/sentry/sentry'
 import { useAddManagedServer } from '@/modules/mcp/add-managed-server.hooks'
 import { useGetMCPServersList } from '@/modules/mcp/managed-mcp-servers.hooks'
 import { useSubmitApiKey } from '@/modules/mcp/submit-api-key.hooks'
@@ -116,10 +115,7 @@ export const AppSelector: FC<AppSelectorProps> = ({
         return
       }
       window.open(response.oauthUrl, '_blank')?.focus()
-    } catch (e) {
-      toast.error(`Failed to add app: ${serverName}`)
-      sentry.captureException(e)
-    }
+    } catch {}
   }
 
   const handleAddServer = async (name: string, description: string) => {
@@ -143,10 +139,7 @@ export const AppSelector: FC<AppSelectorProps> = ({
         return
       }
       window.open(response.oauthUrl, '_blank')?.focus()
-    } catch (e) {
-      toast.error(`Failed to add app: ${name}`)
-      sentry.captureException(e)
-    }
+    } catch {}
   }
 
   const handleSubmitApiKey = async (apiKey: string) => {
@@ -164,7 +157,6 @@ export const AppSelector: FC<AppSelectorProps> = ({
       toast.error(
         `Failed to connect ${apiKeyServer.name}: ${e instanceof Error ? e.message : 'Unknown error'}`,
       )
-      sentry.captureException(e)
     }
   }
 

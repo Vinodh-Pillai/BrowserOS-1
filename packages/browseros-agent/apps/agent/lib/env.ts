@@ -6,9 +6,7 @@ export function parseAlphaFeaturesFlag(value: string | undefined): boolean {
 
 const EnvSchema = z.object({
   VITE_ALPHA_FEATURES: z.string().optional().transform(parseAlphaFeaturesFlag),
-  VITE_PUBLIC_POSTHOG_KEY: z.string().optional(),
-  VITE_PUBLIC_POSTHOG_HOST: z.string().optional(),
-  VITE_PUBLIC_SENTRY_DSN: z.string().optional(),
+
   VITE_PUBLIC_BROWSEROS_API: z.string().optional(),
   PROD: z.boolean().optional().default(false),
 })

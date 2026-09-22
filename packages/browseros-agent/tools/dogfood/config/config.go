@@ -205,9 +205,6 @@ func ExpandTilde(path string, home string) string {
 func DefaultProductionEnv() ProductionEnv {
 	return ProductionEnv{
 		Server: map[string]string{
-			"BROWSEROS_CONFIG_URL": "https://llm.browseros.com/api/browseros-server/config",
-			"POSTHOG_API_KEY":      "",
-			"SENTRY_DSN":           "",
 			"R2_ACCOUNT_ID":        "",
 			"R2_ACCESS_KEY_ID":     "",
 			"R2_SECRET_ACCESS_KEY": "",
@@ -218,7 +215,6 @@ func DefaultProductionEnv() ProductionEnv {
 			"LOG_LEVEL":            "debug",
 		},
 		CLI: map[string]string{
-			"POSTHOG_API_KEY":      "",
 			"R2_ACCOUNT_ID":        "",
 			"R2_ACCESS_KEY_ID":     "",
 			"R2_SECRET_ACCESS_KEY": "",

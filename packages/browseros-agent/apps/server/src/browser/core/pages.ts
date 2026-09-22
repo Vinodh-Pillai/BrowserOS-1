@@ -63,25 +63,64 @@ export class PageManager {
     this.connectionEpoch = cdp.connectionEpoch()
   }
 
+  private isStandardChrome = false
+
+  private async listWithBrowserOSTabs(): Promise<TabInfo[] | null> {
+    try {
+      const result = await this.cdp.Browser.getTabs({ includeHidden: true })
+      return (result.tabs as TabInfo[]).filter(
+        (tab) =>
+          !EXCLUDED_URL_PREFIXES.some((prefix) => tab.url.startsWith(prefix)),
+      )
+    } catch {
+      this.isStandardChrome = true
+      return null
+    }
+  }
+
+  private async listWithTargets(): Promise<TabInfo[]> {
+    const result = await this.cdp.Target.getTargets()
+    const infos = (
+      result.targetInfos as Array<{
+        targetId: string
+        type: string
+        title: string
+        url: string
+        attached: boolean
+      }>
+    ).filter((t) => t.type === 'page')
+
+    return infos.map((info, index) => ({
+      targetId: info.targetId,
+      tabId: index + 1,
+      url: info.url,
+      title: info.title,
+      isActive: info.attached,
+      isLoading: false,
+      loadProgress: 1,
+      isPinned: false,
+      isHidden: false,
+    }))
+  }
+
   /** Reconcile the registry with the browser's live tabs (upsert + drop vanished). */
   async list(): Promise<PageInfo[]> {
     await this.ensureConnected()
-    const result = await this.cdp.Browser.getTabs({ includeHidden: true })
-    const tabs = (result.tabs as TabInfo[]).filter(
-      (tab) =>
-        !EXCLUDED_URL_PREFIXES.some((prefix) => tab.url.startsWith(prefix)),
-    )
+    const tabs =
+      (await this.listWithBrowserOSTabs()) ?? (await this.listWithTargets())
+
+    const hasTabIds = !this.isStandardChrome
 
     const seen = new Set<string>()
     for (const tab of tabs) {
       seen.add(tab.targetId)
-      const existing =
-        this.findByTarget(tab.targetId) ?? this.findByTab(tab.tabId)
+      const existing = hasTabIds
+        ? (this.findByTarget(tab.targetId) ?? this.findByTab(tab.tabId))
+        : this.findByTarget(tab.targetId)
       if (existing) {
         if (existing.targetId !== tab.targetId) {
           this.sessions.delete(existing.targetId)
         }
-        // CDP omits windowId for hidden tabs — preserve the cached value.
         Object.assign(existing, tab, {
           windowId: tab.windowId ?? existing.windowId,
         })
@@ -138,26 +177,54 @@ export class PageManager {
 
   async getActive(): Promise<PageInfo | null> {
     await this.ensureConnected()
-    const result = await this.cdp.Browser.getActiveTab()
-    if (!result.tab) return null
+    if (!this.isStandardChrome) {
+      try {
+        const result = await this.cdp.Browser.getActiveTab()
+        if (result.tab) {
+          await this.list()
+          return this.findByTarget((result.tab as TabInfo).targetId) ?? null
+        }
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
 
     await this.list()
-    const tab = result.tab as TabInfo
-    return this.findByTarget(tab.targetId) ?? null
+    return (
+      [...this.pages.values()].find((p) => p.isActive) ??
+      this.pages.values().next().value ??
+      null
+    )
   }
 
   async getActiveSessionForWindow(windowId: number): Promise<PageSession> {
     await this.ensureConnected()
-    const result = await this.cdp.Browser.getActiveTab({ windowId })
-    const tab = result.tab as TabInfo | undefined
-    if (!tab) throw new Error(`No active tab in window ${windowId}`)
+    if (!this.isStandardChrome) {
+      try {
+        const result = await this.cdp.Browser.getActiveTab({ windowId })
+        const tab = result.tab as TabInfo | undefined
+        if (tab) {
+          const pageId = await this.ensurePageIdForTarget(tab.targetId)
+          const sessionId = await this.attach(tab.targetId, pageId)
+          return {
+            targetId: tab.targetId,
+            session: this.cdp.session(sessionId),
+            url: tab.url,
+          }
+        }
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
 
-    const pageId = await this.ensurePageIdForTarget(tab.targetId)
-    const sessionId = await this.attach(tab.targetId, pageId)
+    await this.list()
+    const info = [...this.pages.values()][0]
+    if (!info) throw new Error('No pages available')
+    const sessionId = await this.attach(info.targetId, info.pageId)
     return {
-      targetId: tab.targetId,
+      targetId: info.targetId,
       session: this.cdp.session(sessionId),
-      url: tab.url,
+      url: info.url,
     }
   }
 
@@ -170,20 +237,24 @@ export class PageManager {
     }
     if (!info) return undefined
 
-    try {
-      const result = await this.cdp.Browser.getTabInfo({ tabId: info.tabId })
-      const tab = result.tab as TabInfo
-      const updated: PageInfo = {
-        ...info,
-        ...tab,
-        windowId: tab.windowId ?? info.windowId,
+    if (!this.isStandardChrome) {
+      try {
+        const result = await this.cdp.Browser.getTabInfo({ tabId: info.tabId })
+        const tab = result.tab as TabInfo
+        const updated: PageInfo = {
+          ...info,
+          ...tab,
+          windowId: tab.windowId ?? info.windowId,
+        }
+        this.pages.set(pageId, updated)
+        return updated
+      } catch {
+        this.isStandardChrome = true
       }
-      this.pages.set(pageId, updated)
-      return updated
-    } catch {
-      await this.list()
-      return this.pages.get(pageId)
     }
+
+    await this.list()
+    return this.pages.get(pageId)
   }
 
   async resolveTabIds(tabIds: number[]): Promise<Map<number, number>> {
@@ -205,6 +276,41 @@ export class PageManager {
     },
   ): Promise<number> {
     await this.ensureConnected()
+    if (!this.isStandardChrome) {
+      try {
+        return await this.newPageBrowserOS(url, opts)
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
+
+    const created = await this.cdp.Target.createTarget({ url })
+    const targetId = created.targetId as string
+    const pageId = this.nextPageId++
+    this.pages.set(pageId, {
+      pageId,
+      targetId,
+      tabId: pageId,
+      url,
+      title: '',
+      isActive: true,
+      isLoading: false,
+      loadProgress: 1,
+      isPinned: false,
+      isHidden: false,
+    })
+    return pageId
+  }
+
+  private async newPageBrowserOS(
+    url: string,
+    opts?: {
+      background?: boolean
+      hidden?: boolean
+      windowId?: number
+      tabGroupId?: string
+    },
+  ): Promise<number> {
     const windowId = await this.resolveWindowIdForNewPage(opts)
     const created = await this.cdp.Browser.createTab({
       url,
@@ -253,44 +359,69 @@ export class PageManager {
       return undefined
     }
 
-    const windows = (await this.cdp.Browser.getWindows())
-      .windows as WindowInfo[]
-    if (opts.windowId !== undefined) {
-      const targetWindow = windows.find(
-        (window) => window.windowId === opts.windowId,
-      )
-      if (targetWindow && !targetWindow.isVisible) {
-        this.hiddenWindowId = targetWindow.windowId
-        return targetWindow.windowId
-      }
-      if (targetWindow?.isVisible) {
-        logger.warn(
-          'Requested hidden page target window is visible, creating a new hidden window instead',
-          { requestedWindowId: opts.windowId },
+    if (this.isStandardChrome) {
+      logger.warn('Hidden pages not supported in standard Chrome')
+      return undefined
+    }
+
+    try {
+      const windows = (await this.cdp.Browser.getWindows())
+        .windows as WindowInfo[]
+      if (opts.windowId !== undefined) {
+        const targetWindow = windows.find(
+          (window) => window.windowId === opts.windowId,
         )
+        if (targetWindow && !targetWindow.isVisible) {
+          this.hiddenWindowId = targetWindow.windowId
+          return targetWindow.windowId
+        }
+        if (targetWindow?.isVisible) {
+          logger.warn(
+            'Requested hidden page target window is visible, creating a new hidden window instead',
+            { requestedWindowId: opts.windowId },
+          )
+        }
+        const hiddenWindow = await this.cdp.Browser.createWindow({
+          hidden: true,
+        })
+        this.hiddenWindowId = (hiddenWindow.window as WindowInfo).windowId
+        return this.hiddenWindowId
       }
+
+      if (this.hiddenWindowId !== undefined) {
+        const cachedWindow = windows.find(
+          (window) => window.windowId === this.hiddenWindowId,
+        )
+        if (cachedWindow && !cachedWindow.isVisible)
+          return cachedWindow.windowId
+        this.hiddenWindowId = undefined
+      }
+
       const hiddenWindow = await this.cdp.Browser.createWindow({ hidden: true })
       this.hiddenWindowId = (hiddenWindow.window as WindowInfo).windowId
       return this.hiddenWindowId
+    } catch {
+      this.isStandardChrome = true
+      logger.warn('Hidden pages not supported in standard Chrome')
+      return undefined
     }
-
-    if (this.hiddenWindowId !== undefined) {
-      const cachedWindow = windows.find(
-        (window) => window.windowId === this.hiddenWindowId,
-      )
-      if (cachedWindow && !cachedWindow.isVisible) return cachedWindow.windowId
-      this.hiddenWindowId = undefined
-    }
-
-    const hiddenWindow = await this.cdp.Browser.createWindow({ hidden: true })
-    this.hiddenWindowId = (hiddenWindow.window as WindowInfo).windowId
-    return this.hiddenWindowId
   }
 
   async close(pageId: number): Promise<void> {
     const info = this.pages.get(pageId)
     if (!info) throw new Error(`Unknown page ${pageId}.`)
-    await this.cdp.Browser.closeTab({ tabId: info.tabId })
+    if (!this.isStandardChrome) {
+      try {
+        await this.cdp.Browser.closeTab({ tabId: info.tabId })
+        this.pages.delete(pageId)
+        this.sessions.delete(info.targetId)
+        this.hooks.onPageDetached?.(pageId)
+        return
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
+    await this.cdp.Target.closeTarget({ targetId: info.targetId })
     this.pages.delete(pageId)
     this.sessions.delete(info.targetId)
     this.hooks.onPageDetached?.(pageId)
@@ -302,17 +433,23 @@ export class PageManager {
   ): Promise<PageInfo> {
     await this.ensureConnected()
     const info = (await this.refresh(pageId)) ?? this.requireInfo(pageId)
-    if (!info.isHidden) {
-      throw new Error(`Page ${pageId} is already visible.`)
+    if (!this.isStandardChrome) {
+      if (!info.isHidden) {
+        throw new Error(`Page ${pageId} is already visible.`)
+      }
+      try {
+        const result = await this.cdp.Browser.showTab({
+          tabId: info.tabId,
+          ...(opts?.windowId !== undefined && { windowId: opts.windowId }),
+          ...(opts?.index !== undefined && { index: opts.index }),
+          ...(opts?.activate !== undefined && { activate: opts.activate }),
+        })
+        return this.updateFromTab(pageId, result.tab as TabInfo)
+      } catch {
+        this.isStandardChrome = true
+      }
     }
-
-    const result = await this.cdp.Browser.showTab({
-      tabId: info.tabId,
-      ...(opts?.windowId !== undefined && { windowId: opts.windowId }),
-      ...(opts?.index !== undefined && { index: opts.index }),
-      ...(opts?.activate !== undefined && { activate: opts.activate }),
-    })
-    return this.updateFromTab(pageId, result.tab as TabInfo)
+    return this.requireInfo(pageId)
   }
 
   async move(
@@ -321,12 +458,19 @@ export class PageManager {
   ): Promise<PageInfo> {
     await this.ensureConnected()
     const info = (await this.refresh(pageId)) ?? this.requireInfo(pageId)
-    const result = await this.cdp.Browser.moveTab({
-      tabId: info.tabId,
-      ...(opts?.windowId !== undefined && { windowId: opts.windowId }),
-      ...(opts?.index !== undefined && { index: opts.index }),
-    })
-    return this.updateFromTab(pageId, result.tab as TabInfo)
+    if (!this.isStandardChrome) {
+      try {
+        const result = await this.cdp.Browser.moveTab({
+          tabId: info.tabId,
+          ...(opts?.windowId !== undefined && { windowId: opts.windowId }),
+          ...(opts?.index !== undefined && { index: opts.index }),
+        })
+        return this.updateFromTab(pageId, result.tab as TabInfo)
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
+    return this.requireInfo(pageId)
   }
 
   detachSession(sessionId: SessionId): void {

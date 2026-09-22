@@ -1,16 +1,13 @@
-import { Feature } from '../browseros/capabilities'
+import type { Feature } from '../browseros/capabilities'
 import type { ProviderTemplate } from './providerTemplates'
-import { type ProviderType, REMOTE_HERMES_PROVIDER_TYPE } from './types'
+import type { ProviderType } from './types'
 
 export type FeatureSupport = (feature: Feature) => boolean
 
 function isProviderTypeVisible(
-  type: ProviderType,
-  supports: FeatureSupport,
+  _type: ProviderType,
+  _supports: FeatureSupport,
 ): boolean {
-  if (type === REMOTE_HERMES_PROVIDER_TYPE) {
-    return supports(Feature.HERMES_AGENT_SUPPORT)
-  }
   return true
 }
 

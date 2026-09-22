@@ -11,7 +11,7 @@ import {
   type ProviderTemplate,
   providerTemplates,
 } from '@/lib/llm-providers/providerTemplates'
-import { REMOTE_HERMES_PROVIDER_TYPE } from '@/lib/llm-providers/types'
+
 import { cn } from '@/lib/utils'
 import type {
   HarnessAdapterDescriptor,
@@ -38,24 +38,17 @@ export const ProviderTemplatesSection: FC<ProviderTemplatesSectionProps> = ({
   const filteredTemplates = visibleProviderTemplates(
     providerTemplates,
     supports,
-  )
-    .filter((template) => {
-      if (template.id === 'chatgpt-pro')
-        return supports(Feature.CHATGPT_PRO_SUPPORT)
-      if (template.id === 'github-copilot')
-        return supports(Feature.GITHUB_COPILOT_SUPPORT)
-      if (template.id === 'qwen-code')
-        return supports(Feature.QWEN_CODE_SUPPORT)
-      if (template.id === 'openai-compatible') {
-        return supports(Feature.OPENAI_COMPATIBLE_SUPPORT)
-      }
-      return true
-    })
-    .sort((a, b) => {
-      if (a.id === REMOTE_HERMES_PROVIDER_TYPE) return -1
-      if (b.id === REMOTE_HERMES_PROVIDER_TYPE) return 1
-      return 0
-    })
+  ).filter((template) => {
+    if (template.id === 'chatgpt-pro')
+      return supports(Feature.CHATGPT_PRO_SUPPORT)
+    if (template.id === 'github-copilot')
+      return supports(Feature.GITHUB_COPILOT_SUPPORT)
+    if (template.id === 'qwen-code') return supports(Feature.QWEN_CODE_SUPPORT)
+    if (template.id === 'openai-compatible') {
+      return supports(Feature.OPENAI_COMPATIBLE_SUPPORT)
+    }
+    return true
+  })
 
   return (
     <Collapsible defaultOpen className="group/collapsible">
@@ -79,13 +72,12 @@ export const ProviderTemplatesSection: FC<ProviderTemplatesSectionProps> = ({
         <CollapsibleContent>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filteredTemplates.map((template, idx) => {
-              const isHermes = template.id === REMOTE_HERMES_PROVIDER_TYPE
               const showCodingAdapters = idx === 0
               return (
                 <Fragment key={template.id}>
                   <ProviderTemplateCard
                     template={template}
-                    highlighted={isHermes}
+                    highlighted={false}
                     onUseTemplate={onUseTemplate}
                   />
                   {showCodingAdapters &&

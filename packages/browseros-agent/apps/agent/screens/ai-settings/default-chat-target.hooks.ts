@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { LlmProviderConfig } from '@/lib/llm-providers/types'
-import { sentry } from '@/lib/sentry/sentry'
 import {
   loadSidepanelChatTargetSelection,
   type SidepanelChatTargetSelection,
@@ -41,15 +40,9 @@ export function useDefaultChatTarget({
 
   useEffect(() => {
     let cancelled = false
-    loadSidepanelChatTargetSelection()
-      .then((stored) => {
-        if (!cancelled) setSelection(stored)
-      })
-      .catch((error) => {
-        sentry.captureException(error, {
-          extra: { message: 'Failed to load default chat-target selection' },
-        })
-      })
+    loadSidepanelChatTargetSelection().then((stored) => {
+      if (!cancelled) setSelection(stored)
+    })
     const unwatch = watchSidepanelChatTargetSelection((stored) => {
       setSelection(stored)
     })
@@ -61,26 +54,11 @@ export function useDefaultChatTarget({
 
   const persistSelection = (next: SidepanelChatTargetSelection) => {
     setSelection(next)
-    saveSidepanelChatTargetSelection(next).catch((error) => {
-      sentry.captureException(error, {
-        extra: {
-          message: 'Failed to persist default chat-target selection',
-          targetId: next.id,
-          targetKind: next.kind,
-        },
-      })
-    })
+    saveSidepanelChatTargetSelection(next).catch(() => {})
   }
 
   const selectProvider = (providerId: string) => {
-    setDefaultProvider(providerId).catch((error) => {
-      sentry.captureException(error, {
-        extra: {
-          message: 'Failed to persist default provider id',
-          providerId,
-        },
-      })
-    })
+    setDefaultProvider(providerId).catch(() => {})
     persistSelection({ kind: 'llm', id: providerId })
   }
 

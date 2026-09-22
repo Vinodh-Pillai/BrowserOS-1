@@ -15,10 +15,6 @@ import {
   type UIMessage,
   wrapLanguageModel,
 } from 'ai'
-import {
-  buildKlavisToolSet,
-  type KlavisProxyRef,
-} from '../api/services/klavis/strata-proxy'
 import type { Browser } from '../browser/browser'
 import type { BrowserSession } from '../browser/core/session'
 import { logger } from '../lib/logger'
@@ -46,7 +42,6 @@ export interface AiSdkAgentConfig {
   browser: Browser
   browserSession: BrowserSession
   browserContext?: BrowserContext
-  klavisRef?: KlavisProxyRef
   browserosId?: string
   aiSdkDevtoolsEnabled?: boolean
   browserUseNewTools: boolean
@@ -56,14 +51,16 @@ export interface AiSdkAgentConfig {
 export function buildAgentFilesystemToolSet(
   resolvedConfig: ResolvedAgentConfig,
 ): ToolSet {
+  const workingDir =
+    resolvedConfig.workingDir ?? process.env.BROWSEROS_WORKING_DIR
   if (
     isAcpProvider(resolvedConfig.provider) ||
     resolvedConfig.chatMode ||
-    !resolvedConfig.workingDir
+    !workingDir
   ) {
     return {}
   }
-  return buildFilesystemToolSet(resolvedConfig.workingDir)
+  return buildFilesystemToolSet(workingDir)
 }
 
 export class AiSdkAgent {
@@ -152,32 +149,15 @@ export class AiSdkAgent {
       })
     }
 
-    // Get Klavis tools from shared background handle (no per-session connection).
-    // Only expose when user has enabled servers — matches old per-session gating.
-    const klavisTools =
-      !useMcpBoundaryOnly &&
-      config.klavisRef?.handle &&
-      config.browserContext?.enabledMcpServers?.length
-        ? buildKlavisToolSet(config.klavisRef.handle)
-        : {}
-
-    // Connect custom (non-Klavis) MCP servers per-session
+    // Connect custom MCP servers per-session
     const specs = useMcpBoundaryOnly
       ? []
       : await buildMcpServerSpecs({
           browserContext: config.browserContext,
         })
     const { clients, tools: customMcpTools } = await createMcpClients(specs)
-    const klavisCollidingToolNames = Object.keys(customMcpTools).filter(
-      (name) => name in klavisTools,
-    )
-    if (klavisCollidingToolNames.length > 0) {
-      logger.warn('Custom MCP tools override Klavis tools', {
-        toolNames: klavisCollidingToolNames,
-      })
-    }
     const rawExternalMcpTools = withoutReservedBrowserToolNames(
-      { ...klavisTools, ...customMcpTools },
+      customMcpTools,
       reservedBrowserToolNames,
     )
 
@@ -245,15 +225,15 @@ export class AiSdkAgent {
     ) {
       excludeSections.push('nudges')
     }
+    const promptWorkspaceDir =
+      config.resolvedConfig.workingDir ?? process.env.BROWSEROS_WORKING_DIR
     const instructions = buildSystemPrompt({
       userSystemPrompt: config.resolvedConfig.userSystemPrompt,
       exclude: excludeSections,
       isScheduledTask: config.resolvedConfig.isScheduledTask,
       scheduledTaskPageId: config.browserContext?.activeTab?.pageId,
-      workspaceDir: config.resolvedConfig.workingDir,
+      workspaceDir: promptWorkspaceDir,
       chatMode: config.resolvedConfig.chatMode,
-      connectedApps: config.browserContext?.enabledMcpServers,
-      declinedApps: config.resolvedConfig.declinedApps,
       origin: config.resolvedConfig.origin,
     })
 

@@ -33,7 +33,6 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useSessionInfo } from '@/lib/auth/sessionStorage'
-import { env } from '@/lib/env'
 import { getQueryKeyFromDocument } from '@/lib/graphql/getQueryKeyFromDocument'
 import { useGraphqlMutation } from '@/modules/graphql/graphql-mutation.hooks'
 import { useGraphqlQuery } from '@/modules/graphql/graphql-query.hooks'
@@ -142,37 +141,8 @@ export const ProfilePage: FC = () => {
 
     const previewUrl = URL.createObjectURL(file)
     setAvatarPreview(previewUrl)
-
-    try {
-      const res = await fetch(
-        `${env.VITE_PUBLIC_BROWSEROS_API}/upload/presigned-url`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ contentType: file.type }),
-        },
-      )
-
-      if (!res.ok) throw new Error('Failed to get upload URL')
-
-      const { presignedUrl, publicUrl, headers } = await res.json()
-
-      const uploadRes = await fetch(presignedUrl, {
-        method: 'PUT',
-        headers,
-        body: file,
-      })
-
-      if (!uploadRes.ok) throw new Error('Failed to upload image')
-
-      setAvatarUrl(publicUrl)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload image')
-      setAvatarPreview(null)
-    } finally {
-      setIsUploading(false)
-    }
+    // Remote upload disabled for local deployment hardening; preview only.
+    setIsUploading(false)
   }
 
   const handleAvatarClick = () => {

@@ -111,7 +111,6 @@ async function createAcpLanguageModel(
     userSystemPrompt: config.userSystemPrompt,
     chatMode: config.chatMode,
     isScheduledTask: config.isScheduledTask,
-    declinedApps: config.declinedApps,
     origin: config.origin,
     acpMode: true,
   }

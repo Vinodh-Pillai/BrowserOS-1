@@ -21,13 +21,11 @@ import { EXIT_CODES } from '@browseros/shared/constants/exit-codes'
 import { CommanderError } from 'commander'
 import { loadServerConfig } from './config'
 import { isPortInUseError } from './lib/port-binding'
-import { Sentry } from './lib/sentry'
 import { Application } from './main'
 
 const configResult = loadServerConfig()
 
 if (!configResult.ok) {
-  Sentry.captureException(new Error(configResult.error))
   console.error(configResult.error)
   process.exit(EXIT_CODES.GENERAL_ERROR)
 }
@@ -43,7 +41,6 @@ try {
   if (isPortInUseError(error)) {
     process.exit(EXIT_CODES.PORT_CONFLICT)
   }
-  Sentry.captureException(error)
   console.error('Failed to start server:', error)
   process.exit(EXIT_CODES.GENERAL_ERROR)
 }

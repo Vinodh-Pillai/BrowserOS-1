@@ -33,17 +33,6 @@ export async function saveProviders(
   }
 }
 
-export function getFaviconUrl(url: string, size = 128): string | undefined {
-  try {
-    const normalized = url.trim()
-    if (!normalized) return undefined
-    const parsed = new URL(
-      normalized.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:/)
-        ? normalized
-        : `https://${normalized}`,
-    )
-    return `https://www.google.com/s2/favicons?domain=${parsed.hostname}&sz=${size}`
-  } catch {
-    return undefined
-  }
+export function getFaviconUrl(_url: string, _size = 128): string | undefined {
+  return undefined
 }

@@ -71,7 +71,7 @@ export type Env = {
 
 /**
  * Configuration for the consolidated HTTP server.
- * This server handles all routes: health, klavis, chat, mcp, provider
+ * This server handles all routes: health, chat, mcp, provider
  */
 export interface HttpServerConfig {
   port: number

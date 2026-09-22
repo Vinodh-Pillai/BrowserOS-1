@@ -1,8 +1,5 @@
 import { z } from 'zod'
-import { OAUTH_MCP_SERVERS } from '../../lib/clients/klavis/oauth-mcp-servers'
 import { defineTool } from './framework'
-
-const appNames = OAUTH_MCP_SERVERS.map((s) => s.name).join(', ')
 
 export const suggest_schedule = defineTool({
   name: 'suggest_schedule',
@@ -33,32 +30,6 @@ export const suggest_schedule = defineTool({
         suggestedName: args.suggestedName,
         scheduleType: args.scheduleType,
         scheduleTime: args.scheduleTime ?? '09:00',
-      }),
-    )
-  },
-})
-
-export const suggest_app_connection = defineTool({
-  name: 'suggest_app_connection',
-  description: `BLOCKING DECISION — Call after tab grouping but before any browser work when the user's request relates to a Connect Apps service but you don't have MCP tools for it. Your response must contain ONLY this tool call with zero text. The appName must be one of: ${appNames}.`,
-  input: z.object({
-    appName: z
-      .string()
-      .describe(
-        'The name of the app to connect (must match a supported app name exactly)',
-      ),
-    reason: z
-      .string()
-      .describe(
-        'A brief, user-friendly explanation of why connecting this app would help',
-      ),
-  }),
-  handler: async (args, _ctx, response) => {
-    response.text(
-      JSON.stringify({
-        type: 'app_connection',
-        appName: args.appName,
-        reason: args.reason,
       }),
     )
   },

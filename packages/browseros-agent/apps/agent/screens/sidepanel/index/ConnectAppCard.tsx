@@ -12,7 +12,6 @@ import {
 import { declinedAppsStorage } from '@/lib/declined-apps/storage'
 import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import { track } from '@/lib/metrics/track'
-import { sentry } from '@/lib/sentry/sentry'
 import { useChatSessionContext } from '@/modules/chat/chat-session-context'
 import { useAddManagedServer } from '@/modules/mcp/add-managed-server.hooks'
 import { useSubmitApiKey } from '@/modules/mcp/submit-api-key.hooks'
@@ -87,9 +86,8 @@ export const ConnectAppCard: FC<ConnectAppCardProps> = ({
         setConnecting(false)
         setPhase('oauth-pending')
       }
-    } catch (e) {
+    } catch (_e) {
       toast.error(`Failed to connect ${appName}`)
-      sentry.captureException(e)
       setConnecting(false)
     }
   }
@@ -121,7 +119,6 @@ export const ConnectAppCard: FC<ConnectAppCardProps> = ({
       toast.error(
         `Failed to connect ${apiKeyServer.name}: ${e instanceof Error ? e.message : 'Unknown error'}`,
       )
-      sentry.captureException(e)
     }
   }
 

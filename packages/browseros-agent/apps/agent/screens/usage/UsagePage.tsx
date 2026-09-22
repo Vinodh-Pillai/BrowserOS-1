@@ -62,7 +62,7 @@ export const UsagePage: FC = () => {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Coins className="h-5 w-5 text-muted-foreground" />
-            <span className="font-semibold text-sm">Daily Credits</span>
+            <span className="font-semibold text-sm">Credits</span>
           </div>
           <span
             className={cn('font-bold text-2xl', getCreditTextColor(credits))}
@@ -108,14 +108,12 @@ export const UsagePage: FC = () => {
         <div className="flex items-center gap-3">
           <CreditCard className="h-5 w-5 text-muted-foreground" />
           <div>
-            <p className="flex items-center gap-2 font-semibold text-sm">
-              Need more credits?
-              <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-[10px] text-muted-foreground uppercase tracking-wide">
-                Coming soon
-              </span>
+            <p className="font-semibold text-sm">
+              Usage tracking disabled in local builds
             </p>
             <p className="text-muted-foreground text-xs">
-              Additional credit packages will be available soon
+              Credits are not available in this build. Add an LLM provider for
+              unlimited usage.
             </p>
           </div>
         </div>

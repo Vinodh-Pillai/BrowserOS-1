@@ -7,14 +7,7 @@
  */
 
 import { LLM_PROVIDERS, type LLMConfig } from '@browseros/shared/schemas/llm'
-import { INLINED_ENV } from '../../../env'
-import { logger } from '../../logger'
-import { fetchBrowserOSConfig, getLLMConfigFromProvider } from '../gateway'
 import { getOAuthTokenManager } from '../oauth'
-import {
-  resolveMockBrowserOSConfig,
-  shouldUseMockBrowserOSLLM,
-} from './mock-language-model'
 import type { ResolvedLLMConfig } from './types'
 
 export async function resolveLLMConfig(
@@ -51,12 +44,11 @@ export async function resolveLLMConfig(
     })
   }
 
-  // BrowserOS gateway: fetch config from remote service
+  // BrowserOS gateway disabled in hardened local build
   if (config.provider === LLM_PROVIDERS.BROWSEROS) {
-    if (shouldUseMockBrowserOSLLM(config)) {
-      return resolveMockBrowserOSConfig(config, browserosId)
-    }
-    return resolveBrowserOSConfig(config, browserosId)
+    throw new Error(
+      'BrowserOS cloud provider is disabled in this build. Configure a local provider (Ollama/LM Studio) or other provider instead.',
+    )
   }
 
   // All other providers: passthrough with model validation
@@ -104,28 +96,4 @@ async function resolveOAuthConfig(
   }
 }
 
-async function resolveBrowserOSConfig(
-  config: LLMConfig,
-  browserosId?: string,
-): Promise<ResolvedLLMConfig> {
-  const configUrl = INLINED_ENV.BROWSEROS_CONFIG_URL
-  if (!configUrl) {
-    throw new Error(
-      'BROWSEROS_CONFIG_URL environment variable is required for BrowserOS provider',
-    )
-  }
-
-  logger.debug('Resolving BROWSEROS config', { configUrl, browserosId })
-
-  const browserosConfig = await fetchBrowserOSConfig(configUrl, browserosId)
-  const llmConfig = getLLMConfigFromProvider(browserosConfig, 'default')
-
-  return {
-    ...config,
-    model: llmConfig.modelName,
-    apiKey: llmConfig.apiKey,
-    baseUrl: llmConfig.baseUrl,
-    upstreamProvider: llmConfig.providerType,
-    browserosId,
-  }
-}
+// resolveBrowserOSConfig removed — cloud provider disabled in hardened local build

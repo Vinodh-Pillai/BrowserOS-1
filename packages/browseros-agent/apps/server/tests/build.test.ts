@@ -29,11 +29,7 @@ function getNativeTarget(): { id: string; ext: string } {
   return { id: `${os}-${cpu}`, ext: process.platform === 'win32' ? '.exe' : '' }
 }
 
-const REQUIRED_INLINE_ENV_KEYS = [
-  'BROWSEROS_CONFIG_URL',
-  'POSTHOG_API_KEY',
-  'SENTRY_DSN',
-] as const
+const REQUIRED_INLINE_ENV_KEYS = [] as const
 
 const R2_ENV_KEYS = [
   'R2_ACCOUNT_ID',
@@ -44,11 +40,7 @@ const R2_ENV_KEYS = [
 
 const PROD_SECRET_KEYS = [...REQUIRED_INLINE_ENV_KEYS, ...R2_ENV_KEYS]
 
-const INLINE_ENV_STUBS: Record<string, string> = {
-  BROWSEROS_CONFIG_URL: 'https://stub.test/config',
-  POSTHOG_API_KEY: 'phc_test_stub',
-  SENTRY_DSN: 'https://stub@sentry.test/0',
-}
+const INLINE_ENV_STUBS: Record<string, string> = {}
 
 const R2_ENV_STUBS: Record<string, string> = {
   R2_ACCOUNT_ID: 'test',

@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import type { ResponseReceivedEvent } from '@browseros/cdp-protocol/domains/network'
 import type { ProtocolApi } from '@browseros/cdp-protocol/protocol-api'
 import { logger } from '../lib/logger'
 import type { CdpBackend } from './backends/types'
@@ -50,6 +53,7 @@ export interface SetWindowVisibilityResult {
 export class Browser {
   private cdp: CdpBackend
   private core: BrowserSession
+  private isStandardChrome = false
 
   constructor(cdp: CdpBackend) {
     this.cdp = cdp
@@ -598,6 +602,29 @@ export class Browser {
     element: number,
     downloadPath: string,
   ): Promise<{ filePath: string; suggestedFilename: string }> {
+    if (!this.isStandardChrome) {
+      try {
+        await this.cdp.Browser.setDownloadBehavior({
+          behavior: 'allowAndName',
+          downloadPath,
+          eventsEnabled: true,
+        })
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
+    if (this.isStandardChrome) {
+      return this.downloadViaClickStandard(page, element, downloadPath)
+    }
+
+    return this.downloadViaClickBrowserOS(page, element, downloadPath)
+  }
+
+  private async downloadViaClickBrowserOS(
+    page: number,
+    element: number,
+    downloadPath: string,
+  ): Promise<{ filePath: string; suggestedFilename: string }> {
     await this.cdp.Browser.setDownloadBehavior({
       behavior: 'allowAndName',
       downloadPath,
@@ -655,46 +682,175 @@ export class Browser {
     )
   }
 
+  private async downloadViaClickStandard(
+    page: number,
+    element: number,
+    downloadPath: string,
+  ): Promise<{ filePath: string; suggestedFilename: string }> {
+    const pageSession = await this.core.pages.getSession(page)
+    const session = pageSession.session
+    await session.Network.enable()
+
+    return new Promise<{ filePath: string; suggestedFilename: string }>(
+      (resolve, reject) => {
+        let resolved = false
+        const timeout = setTimeout(() => {
+          cleanUp()
+          if (!resolved) reject(new Error('Download timed out after 60s'))
+        }, 60000)
+
+        const unsubResponse = session.Network.on(
+          'responseReceived',
+          (params: ResponseReceivedEvent) => {
+            if (resolved) return
+            if (!isDownloadResponse(params)) return
+
+            resolved = true
+            clearTimeout(timeout)
+            void handleDownloadResponse(params)
+          },
+        )
+
+        const handleDownloadResponse = async (
+          params: ResponseReceivedEvent,
+        ) => {
+          try {
+            const result = await session.Network.getResponseBody({
+              requestId: params.requestId,
+            })
+            const suggestedFilename = extractDownloadFilename(
+              params.response.headers,
+              params.response.url,
+            )
+            const buffer = result.base64Encoded
+              ? Buffer.from(result.body, 'base64')
+              : Buffer.from(result.body, 'utf-8')
+            const filePath = path.join(downloadPath, suggestedFilename)
+            fs.writeFileSync(filePath, buffer)
+            await session.Network.disable()
+            resolve({ filePath, suggestedFilename })
+          } catch (err) {
+            this.logDownloadError(err)
+            await session.Network.disable().catch(() => {})
+            if (!resolved) {
+              resolved = true
+              reject(
+                err instanceof Error
+                  ? err
+                  : new Error('Failed to capture download'),
+              )
+            }
+          } finally {
+            cleanUp()
+          }
+        }
+
+        const cleanUp = () => {
+          clearTimeout(timeout)
+          unsubResponse()
+        }
+
+        this.click(page, element).catch((err) => {
+          if (resolved) return
+          resolved = true
+          cleanUp()
+          session.Network.disable().catch(() => {})
+          reject(err)
+        })
+      },
+    )
+  }
+
+  private logDownloadError(err: unknown): void {
+    logger.warn('Standard Chrome download via Network failed', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
   // --- Windows ---
 
   async listWindows(): Promise<WindowInfo[]> {
-    const result = await this.cdp.Browser.getWindows()
-    return result.windows as WindowInfo[]
+    if (!this.isStandardChrome) {
+      try {
+        const result = await this.cdp.Browser.getWindows()
+        return result.windows as WindowInfo[]
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
+    return []
   }
 
   async createWindow(opts?: { hidden?: boolean }): Promise<WindowInfo> {
-    const result = await this.cdp.Browser.createWindow({
-      hidden: opts?.hidden ?? false,
-    })
-    return result.window as WindowInfo
+    if (!this.isStandardChrome) {
+      try {
+        const result = await this.cdp.Browser.createWindow({
+          hidden: opts?.hidden ?? false,
+        })
+        return result.window as WindowInfo
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
+    if (opts?.hidden) {
+      throw new Error('Hidden windows not supported in standard Chrome')
+    }
+    return {
+      windowId: 1,
+      windowType: 'normal',
+      bounds: { width: 1280, height: 720, windowState: 'normal' },
+      isActive: true,
+      isVisible: true,
+      tabCount: 1,
+      activeTabId: undefined,
+    }
   }
 
   async closeWindow(windowId: number): Promise<void> {
-    await this.cdp.Browser.closeWindow({ windowId })
+    if (!this.isStandardChrome) {
+      try {
+        await this.cdp.Browser.closeWindow({ windowId })
+        return
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
+    throw new Error('Window management not supported in standard Chrome')
   }
 
   async activateWindow(windowId: number): Promise<void> {
-    await this.cdp.Browser.activateWindow({ windowId })
+    if (!this.isStandardChrome) {
+      try {
+        await this.cdp.Browser.activateWindow({ windowId })
+        return
+      } catch {
+        this.isStandardChrome = true
+      }
+    }
+    throw new Error('Window management not supported in standard Chrome')
   }
 
-  /**
-   * Changes a window between hidden and visible states.
-   * BrowserOS may replace the underlying window, so callers must use the returned window ID.
-   */
   async setWindowVisibility(
     windowId: number,
     opts: { visible: boolean; activate?: boolean },
   ): Promise<SetWindowVisibilityResult> {
-    const result = await this.cdp.Browser.setWindowVisibility({
-      windowId,
-      visible: opts.visible,
-      ...(opts.activate !== undefined && { activate: opts.activate }),
-    })
-    return {
-      window: result.window as WindowInfo,
-      replaced: result.replaced,
-      previousWindowId: result.previousWindowId,
+    if (!this.isStandardChrome) {
+      try {
+        const result = await this.cdp.Browser.setWindowVisibility({
+          windowId,
+          visible: opts.visible,
+          ...(opts.activate !== undefined && { activate: opts.activate }),
+        })
+        return {
+          window: result.window as WindowInfo,
+          replaced: result.replaced,
+          previousWindowId: result.previousWindowId,
+        }
+      } catch {
+        this.isStandardChrome = true
+      }
     }
+    throw new Error('Window visibility not supported in standard Chrome')
   }
 
   async showPage(
@@ -841,4 +997,99 @@ export class Browser {
   async closeTabGroup(groupId: string): Promise<void> {
     return tabGroups.closeTabGroup(this.cdp, groupId)
   }
+}
+
+// --- Download helper functions ---
+
+const DOWNLOAD_EXTENSIONS = new Set([
+  '.zip',
+  '.tar',
+  '.gz',
+  '.bz2',
+  '.xz',
+  '.7z',
+  '.rar',
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+  '.exe',
+  '.msi',
+  '.dmg',
+  '.pkg',
+  '.deb',
+  '.rpm',
+  '.AppImage',
+  '.iso',
+  '.img',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.svg',
+  '.webp',
+  '.ico',
+  '.mp3',
+  '.mp4',
+  '.avi',
+  '.mov',
+  '.mkv',
+  '.wav',
+  '.flac',
+  '.csv',
+  '.json',
+  '.xml',
+  '.sql',
+  '.db',
+  '.ttf',
+  '.otf',
+  '.woff',
+  '.woff2',
+])
+
+function isDownloadResponse(params: ResponseReceivedEvent): boolean {
+  const headers = params.response.headers as Record<string, unknown>
+
+  const contentDisposition = String(
+    headers['content-disposition'] ?? headers['Content-Disposition'] ?? '',
+  ).toLowerCase()
+  if (contentDisposition.includes('attachment')) return true
+  if (contentDisposition.includes('filename=')) return true
+
+  const contentType = String(
+    headers['content-type'] ?? headers['Content-Type'] ?? '',
+  ).toLowerCase()
+  if (
+    contentType === 'application/octet-stream' ||
+    contentType === 'application/forced-download'
+  ) {
+    return true
+  }
+
+  const url = params.response.url
+  const urlPath = url.split('?')[0].toLowerCase()
+  for (const ext of DOWNLOAD_EXTENSIONS) {
+    if (urlPath.endsWith(ext)) return true
+  }
+
+  return false
+}
+
+function extractDownloadFilename(
+  headers: Record<string, unknown>,
+  url: string,
+): string {
+  const cd = String(
+    headers['content-disposition'] ?? headers['Content-Disposition'] ?? '',
+  )
+  const filenameMatch = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"'\s;]+)/i)
+  if (filenameMatch) return decodeURIComponent(filenameMatch[1])
+
+  const urlPath = url.split('?')[0].split('/').pop()
+  if (urlPath && urlPath.includes('.')) return decodeURIComponent(urlPath)
+
+  return `download-${Date.now()}`
 }

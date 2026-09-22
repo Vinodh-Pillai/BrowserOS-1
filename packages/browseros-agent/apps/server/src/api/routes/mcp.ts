@@ -10,8 +10,6 @@ import type { Browser } from '../../browser/browser'
 import type { BrowserSession } from '../../browser/core/session'
 import { logger } from '../../lib/logger'
 import { metrics } from '../../lib/metrics'
-import { Sentry } from '../../lib/sentry'
-import type { KlavisProxyRef } from '../services/klavis/strata-proxy'
 import { createMcpServer } from '../services/mcp/mcp-server'
 import type { Env } from '../types'
 
@@ -19,7 +17,6 @@ interface McpRouteDeps {
   version: string
   browser: Browser
   browserSession: BrowserSession
-  klavisRef?: KlavisProxyRef
   browserUseNewTools?: boolean
 }
 
@@ -64,7 +61,6 @@ export function createMcpRoutes(deps: McpRouteDeps) {
       version: deps.version,
       browser: deps.browser,
       browserSession: deps.browserSession,
-      klavisRef: deps.klavisRef,
       browserUseNewTools: deps.browserUseNewTools === true,
       defaultWindowId,
       defaultTabGroupId,
@@ -78,11 +74,6 @@ export function createMcpRoutes(deps: McpRouteDeps) {
       await mcpServer.connect(transport)
       return transport.handleRequest(c)
     } catch (error) {
-      Sentry.withScope((scope) => {
-        scope.setTag('route', 'mcp')
-        scope.setTag('scopeId', scopeId)
-        Sentry.captureException(error)
-      })
       logger.error('Error handling MCP request', {
         error: error instanceof Error ? error.message : String(error),
       })

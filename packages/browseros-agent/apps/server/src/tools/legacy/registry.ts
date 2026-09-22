@@ -70,7 +70,7 @@ import {
   set_window_visibility,
 } from './browser/windows'
 import { browseros_info } from './browseros-info'
-import { suggest_app_connection, suggest_schedule } from './nudges'
+import { suggest_schedule } from './nudges'
 import { createRegistry } from './tool-registry'
 
 export const registry = createRegistry([
@@ -149,7 +149,6 @@ export const registry = createRegistry([
   // Info (1)
   browseros_info,
 
-  // Nudges (2)
+  // Nudges (1)
   suggest_schedule,
-  suggest_app_connection,
 ])

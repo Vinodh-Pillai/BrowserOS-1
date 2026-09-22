@@ -10,7 +10,6 @@ import {
 } from '@/lib/constants/analyticsEvents'
 import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import { track } from '@/lib/metrics/track'
-import { sentry } from '@/lib/sentry/sentry'
 import { useAddManagedServer } from '@/modules/mcp/add-managed-server.hooks'
 import { useGetUserMCPIntegrations } from '@/modules/mcp/user-integrations.hooks'
 import { type StepDirection, StepTransition } from './StepTransition'
@@ -107,10 +106,7 @@ export const StepConnectApps = ({
       }
 
       track(ONBOARDING_APP_CONNECTED_EVENT, { app_name: appName })
-    } catch (e) {
-      sentry.captureException(e, {
-        extra: { message: 'Failed to connect app during onboarding', appName },
-      })
+    } catch {
     } finally {
       setConnectingApp(null)
     }

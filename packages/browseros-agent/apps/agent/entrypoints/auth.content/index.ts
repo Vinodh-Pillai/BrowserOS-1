@@ -5,7 +5,7 @@ import {
 } from '@/lib/messaging/runtime/runtimeMessages'
 
 export default defineContentScript({
-  matches: [`${env.VITE_PUBLIC_BROWSEROS_API}/home`],
+  matches: [`${env.VITE_PUBLIC_BROWSEROS_API ?? 'http://127.0.0.1:9100'}/home`],
   runAt: 'document_start',
   main() {
     window.addEventListener('message', (event) => {

@@ -46,14 +46,6 @@ function enrichTemplate(
  */
 export const providerTemplates: ProviderTemplate[] = [
   {
-    id: 'remote-hermes',
-    name: 'Remote Hermes',
-    defaultBaseUrl: '',
-    defaultModelId: 'default',
-    supportsImages: false,
-    contextWindow: 200000,
-  },
-  {
     id: 'chatgpt-pro',
     name: 'ChatGPT Plus/Pro',
     defaultBaseUrl: 'https://chatgpt.com/backend-api',
@@ -155,7 +147,6 @@ export const providerTemplates: ProviderTemplate[] = [
  * @public
  */
 export const providerTypeOptions: { value: ProviderType; label: string }[] = [
-  { value: 'remote-hermes', label: 'Remote Hermes' },
   { value: 'chatgpt-pro', label: 'ChatGPT Plus/Pro' },
   { value: 'github-copilot', label: 'GitHub Copilot' },
   { value: 'qwen-code', label: 'Qwen Code' },
@@ -171,7 +162,6 @@ export const providerTypeOptions: { value: ProviderType; label: string }[] = [
   { value: 'ollama', label: 'Ollama' },
   { value: 'lmstudio', label: 'LM Studio' },
   { value: 'bedrock', label: 'AWS Bedrock' },
-  { value: 'browseros', label: 'BrowserOS' },
 ]
 
 /**
@@ -189,7 +179,6 @@ export const getProviderTemplate = (
  * Auto-fills when user selects a provider type
  */
 const DEFAULT_BASE_URLS: Record<ProviderType, string> = {
-  'remote-hermes': '',
   'chatgpt-pro': 'https://chatgpt.com/backend-api',
   'github-copilot': 'https://api.githubcopilot.com',
   'qwen-code': 'https://portal.qwen.ai/v1',
@@ -207,6 +196,7 @@ const DEFAULT_BASE_URLS: Record<ProviderType, string> = {
   lmstudio: 'http://localhost:1234/v1',
   bedrock: '',
   browseros: '',
+  // NOTE: browseros provider removed — remote API calls disabled
 }
 
 /**

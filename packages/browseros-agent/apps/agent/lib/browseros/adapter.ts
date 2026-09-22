@@ -208,12 +208,10 @@ export class BrowserOSAdapter {
   }
 
   async getVersion(): Promise<string | null> {
+    if (typeof chrome.browserOS?.getVersionNumber !== 'function') {
+      return null
+    }
     return new Promise<string | null>((resolve, reject) => {
-      if (typeof chrome.browserOS.getVersionNumber !== 'function') {
-        resolve(null)
-        return
-      }
-
       chrome.browserOS.getVersionNumber((version: string) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message || 'Unknown error'))
@@ -225,12 +223,10 @@ export class BrowserOSAdapter {
   }
 
   async getBrowserosVersion(): Promise<string | null> {
+    if (typeof chrome.browserOS?.getBrowserosVersionNumber !== 'function') {
+      return null
+    }
     return new Promise<string | null>((resolve, reject) => {
-      if (typeof chrome.browserOS.getBrowserosVersionNumber !== 'function') {
-        resolve(null)
-        return
-      }
-
       chrome.browserOS.getBrowserosVersionNumber((version: string) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message || 'Unknown error'))
@@ -245,7 +241,7 @@ export class BrowserOSAdapter {
     eventName: string,
     properties?: Record<string, any>,
   ): Promise<void> {
-    if (typeof chrome.browserOS.logMetric !== 'function') {
+    if (typeof chrome.browserOS?.logMetric !== 'function') {
       return
     }
 
@@ -396,10 +392,11 @@ export class BrowserOSAdapter {
   }
 
   isAPIAvailable(method: string): boolean {
-    return method in chrome.browserOS
+    return chrome.browserOS ? method in chrome.browserOS : false
   }
 
   getAvailableAPIs(): string[] {
+    if (!chrome.browserOS) return []
     return Object.keys(chrome.browserOS).filter(
       (key) => typeof (chrome.browserOS as any)[key] === 'function',
     )

@@ -84,7 +84,6 @@
     "@hono/zod-validator": "^0.4.3",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@openrouter/ai-sdk-provider": "^2.2.3",
-    "@sentry/bun": "^10.31.0",
     "acp-probe": "^0.0.2",
     "acpx": "^0.10.0",
     "acpx-ai-provider": "^0.0.6",
@@ -98,7 +97,6 @@
     "jose": "^5.9.6",
     "partysocket": "^1.1.5",
     "pino": "^9.6.0",
-    "posthog-node": "^4.17.0",
     "zod": "^3.24.2",
     "zod-from-json-schema": "^0.1.0"
   },

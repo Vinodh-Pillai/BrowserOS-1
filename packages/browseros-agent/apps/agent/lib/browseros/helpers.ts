@@ -2,12 +2,7 @@ import { getBrowserOSAdapter } from './adapter'
 import { Capabilities, Feature } from './capabilities'
 import { BROWSEROS_PREFS } from './prefs'
 
-class McpPortError extends Error {
-  constructor() {
-    super('MCP server port not configured.')
-    this.name = 'McpPortError'
-  }
-}
+const DEFAULT_MCP_PORT = 9100
 
 /**
  * Returns the local BrowserOS server base URL for chat and agent APIs.
@@ -30,7 +25,7 @@ async function getMcpPort(): Promise<number> {
     // BrowserOS API not available
   }
 
-  throw new McpPortError()
+  return DEFAULT_MCP_PORT
 }
 
 /**

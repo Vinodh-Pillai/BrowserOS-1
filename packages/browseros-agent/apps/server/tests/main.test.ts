@@ -97,7 +97,6 @@ async function setupApplicationTest() {
   const identityModule = await import('../src/lib/identity')
   const loggerModule = await import('../src/lib/logger')
   const metricsModule = await import('../src/lib/metrics')
-  const sentryModule = await import('../src/lib/sentry')
 
   const createHttpServer = spyOn(apiServer, 'createHttpServer')
   createHttpServer.mockImplementation(async () => ({}) as never)
@@ -141,10 +140,6 @@ async function setupApplicationTest() {
   spyOn(metricsModule.metrics, 'initialize').mockImplementation(() => {})
   spyOn(metricsModule.metrics, 'isEnabled').mockImplementation(() => true)
   spyOn(metricsModule.metrics, 'log').mockImplementation(() => {})
-
-  spyOn(sentryModule.Sentry, 'setContext').mockImplementation(() => {})
-  spyOn(sentryModule.Sentry, 'setUser').mockImplementation(() => {})
-  spyOn(sentryModule.Sentry, 'captureException').mockImplementation(() => {})
 
   spyOn(runtimeModule, 'configureClaudeRuntime').mockImplementation(
     () => ({}) as never,

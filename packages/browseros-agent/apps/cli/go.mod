@@ -6,7 +6,6 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/minio/selfupdate v0.6.0
 	github.com/modelcontextprotocol/go-sdk v1.4.0
-	github.com/posthog/posthog-go v1.11.2
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/mod v0.34.0
 	gopkg.in/yaml.v3 v3.0.1

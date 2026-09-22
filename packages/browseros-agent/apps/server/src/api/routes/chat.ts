@@ -1,4 +1,3 @@
-import { REMOTE_HERMES_PROVIDER_TYPE } from '@browseros/shared/constants/hermes'
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
 import { SessionStore } from '../../agent/session-store'
@@ -6,10 +5,8 @@ import type { Browser } from '../../browser/browser'
 import type { BrowserSession } from '../../browser/core/session'
 import { logger } from '../../lib/logger'
 import { metrics } from '../../lib/metrics'
-import { Sentry } from '../../lib/sentry'
 import { ChatService } from '../services/chat-service'
-import type { KlavisProxyRef } from '../services/klavis/strata-proxy'
-import type { RemoteHermesService } from '../services/remote-hermes/remote-hermes-service'
+
 import { ChatRequestSchema } from '../types'
 import { ConversationIdParamSchema } from '../utils/validation'
 
@@ -17,7 +14,6 @@ interface ChatRouteDeps {
   browser: Browser
   browserSession: BrowserSession
   browserosId?: string
-  klavisRef?: KlavisProxyRef
   aiSdkDevtoolsEnabled?: boolean
   browserUseNewTools?: boolean
   /** Port the BrowserOS server bound to. Threaded to ACP providers so
@@ -27,9 +23,6 @@ interface ChatRouteDeps {
    *  bundled-Bun launcher under <resourcesDir>/bin/third_party/bun
    *  can be located for built-in adapters (claude / codex). */
   resourcesDir?: string | null
-  /** Configured at server startup when AGENT_RUNNER_JWT_SECRET is set.
-   *  Null otherwise; `remote-hermes` chat requests get a soft 500. */
-  remoteHermes?: RemoteHermesService | null
 }
 
 export function createChatRoutes(deps: ChatRouteDeps) {
@@ -38,7 +31,6 @@ export function createChatRoutes(deps: ChatRouteDeps) {
   const sessionStore = new SessionStore()
   const service = new ChatService({
     sessionStore,
-    klavisRef: deps.klavisRef,
     browser: deps.browser,
     browserSession: deps.browserSession,
     browserosId,
@@ -52,25 +44,6 @@ export function createChatRoutes(deps: ChatRouteDeps) {
     .post('/', zValidator('json', ChatRequestSchema), async (c) => {
       const request = c.req.valid('json')
 
-      // Sentry + metrics (HTTP concerns only)
-      Sentry.getCurrentScope().setTag(
-        'request-type',
-        request.isScheduledTask ? 'schedule' : 'chat',
-      )
-      Sentry.setContext('request', {
-        provider: request.provider,
-        model: request.model,
-        baseUrl: request.baseUrl
-          ? (() => {
-              try {
-                return new URL(request.baseUrl).origin
-              } catch {
-                return undefined
-              }
-            })()
-          : undefined,
-      })
-
       metrics.log('chat.request', {
         provider: request.provider,
         model: request.model,
@@ -81,30 +54,6 @@ export function createChatRoutes(deps: ChatRouteDeps) {
         provider: request.provider,
         model: request.model,
       })
-
-      if (request.provider === REMOTE_HERMES_PROVIDER_TYPE) {
-        if (!deps.remoteHermes) {
-          logger.warn(
-            'Remote Hermes chat received but service not configured',
-            {
-              conversationId: request.conversationId,
-            },
-          )
-          return c.json({ error: 'remote_hermes_not_configured' }, 500)
-        }
-        logger.info('Routing chat to Remote Hermes', {
-          conversationId: request.conversationId,
-          model: request.model,
-        })
-        return deps.remoteHermes.streamTurn(
-          {
-            conversationId: request.conversationId,
-            message: request.message,
-            modelId: request.model,
-          },
-          c.req.raw.signal,
-        )
-      }
 
       return service.processMessage(request, c.req.raw.signal)
     })

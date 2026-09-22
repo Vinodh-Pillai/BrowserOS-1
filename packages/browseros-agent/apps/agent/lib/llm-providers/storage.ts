@@ -1,5 +1,4 @@
 import { storage } from '@wxt-dev/storage'
-import { sessionStorage } from '@/lib/auth/sessionStorage'
 import { getBrowserOSAdapter } from '@/lib/browseros/adapter'
 import { BROWSEROS_PREFS } from '@/lib/browseros/prefs'
 import {
@@ -7,7 +6,6 @@ import {
   DEFAULT_PROVIDER_NAME,
 } from './provider-selection'
 import type { LlmProviderConfig, LlmProvidersBackup } from './types'
-import { uploadLlmProvidersToGraphql } from './uploadLlmProvidersToGraphql'
 
 export { DEFAULT_PROVIDER_ID } from './provider-selection'
 
@@ -60,14 +58,7 @@ export function setupLlmProvidersBackupToBrowserOS(): () => void {
 }
 
 export async function syncLlmProviders(): Promise<void> {
-  const providers = await providersStorage.getValue()
-  if (!providers || providers.length === 0) return
-
-  const session = await sessionStorage.getValue()
-  const userId = session?.user?.id
-  if (!userId) return
-
-  await uploadLlmProvidersToGraphql(providers, userId)
+  // Disabled: no data leaves this machine
 }
 
 /**
@@ -103,17 +94,17 @@ export async function loadProviders(): Promise<LlmProviderConfig[]> {
   return normalizedProviders
 }
 
-/** Creates the default BrowserOS provider configuration */
-export function createDefaultBrowserOSProvider(): LlmProviderConfig {
+/** Creates the default Ram provider configuration */
+export function createDefaultRamProvider(): LlmProviderConfig {
   const timestamp = Date.now()
   return {
     id: DEFAULT_PROVIDER_ID,
-    type: 'browseros',
+    type: 'openai-compatible',
     name: DEFAULT_PROVIDER_NAME,
-    baseUrl: 'https://api.browseros.com/v1',
-    modelId: 'browseros-auto',
+    baseUrl: 'http://192.168.4.103:8000/v1',
+    modelId: 'Qwen/Qwen3.6-27B-FP8',
     supportsImages: true,
-    contextWindow: 200000,
+    contextWindow: 128000,
     temperature: 0.2,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -122,7 +113,7 @@ export function createDefaultBrowserOSProvider(): LlmProviderConfig {
 
 /** Creates the default providers configuration. Only call when storage is empty. */
 export function createDefaultProvidersConfig(): LlmProviderConfig[] {
-  return [createDefaultBrowserOSProvider()]
+  return [createDefaultRamProvider()]
 }
 
 /**

@@ -6,7 +6,7 @@
  * Consolidated HTTP Server
  *
  * This server combines:
- * - Agent HTTP routes (chat, klavis, provider)
+ * - Agent HTTP routes (chat, provider)
  * - MCP HTTP routes (using @hono/mcp transport)
  */
 
@@ -15,34 +15,22 @@ import { websocket } from 'hono/bun'
 import { cors } from 'hono/cors'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { HttpAgentError } from '../agent/errors'
-import { INLINED_ENV } from '../env'
-import { KlavisClient } from '../lib/clients/klavis/klavis-client'
 import { initializeOAuth, shutdownOAuth } from '../lib/clients/oauth'
-import { RemoteHermesClient } from '../lib/clients/remote-hermes/remote-hermes-client'
 import { getDb } from '../lib/db'
 import { logger } from '../lib/logger'
-import { Sentry } from '../lib/sentry'
 import { requireTrustedOrigin } from './middleware/require-trusted-origin'
 import { createAcpxProbeRoutes } from './routes/acpx-probe'
 import { createAgentRoutes } from './routes/agents'
 import { createChatRoutes } from './routes/chat'
-import { createCreditsRoutes } from './routes/credits'
 import { createHealthRoute } from './routes/health'
-import { createKlavisRoutes } from './routes/klavis'
 import { createMcpRoutes } from './routes/mcp'
 import { createMcpManagerRoutes } from './routes/mcp-manager'
 import { createOAuthRoutes } from './routes/oauth'
 import { createProviderRoutes } from './routes/provider'
 import { createRefinePromptRoutes } from './routes/refine-prompt'
-import { createRemoteHermesRoutes } from './routes/remote-hermes'
 import { createScreencastRoute } from './routes/screencast'
 import { createShutdownRoute } from './routes/shutdown'
 import { createStatusRoute } from './routes/status'
-import {
-  connectKlavisInBackground,
-  type KlavisProxyRef,
-} from './services/klavis/strata-proxy'
-import { RemoteHermesService } from './services/remote-hermes/remote-hermes-service'
 import type { Env, HttpServerConfig } from './types'
 import { defaultCorsConfig } from './utils/cors'
 import { requireTrustedAppOrigin } from './utils/request-auth'
@@ -87,33 +75,6 @@ export async function createHttpServer(config: HttpServerConfig) {
     : null
   if (!browserosId) shutdownOAuth()
 
-  // Connect Klavis proxy in background with retry — browser tools available immediately
-  const klavisRef: KlavisProxyRef = { handle: null }
-  const stopKlavisBackground = browserosId
-    ? connectKlavisInBackground(klavisRef, {
-        klavisClient: new KlavisClient(),
-        browserosId,
-      })
-    : () => {}
-
-  // Remote Hermes provider. Opt-in via AGENT_RUNNER_JWT_SECRET in env;
-  // when absent we still wire the routes but they return a soft
-  // not_configured response (agent UI degrades gracefully).
-  const remoteHermes =
-    browserosId && INLINED_ENV.AGENT_RUNNER_JWT_SECRET
-      ? new RemoteHermesService({
-          client: new RemoteHermesClient({
-            browserosId,
-            jwtSecret: INLINED_ENV.AGENT_RUNNER_JWT_SECRET,
-          }),
-          resolveLocalMcpUrl: (server) =>
-            server === 'browseros' ? `http://127.0.0.1:${port}/mcp` : null,
-        })
-      : null
-  if (!remoteHermes) {
-    logger.warn('Remote Hermes disabled: AGENT_RUNNER_JWT_SECRET not set')
-  }
-
   const agentRoutes = new Hono<Env>()
     .use('/*', requireTrustedAppOrigin())
     .route(
@@ -134,13 +95,6 @@ export async function createHttpServer(config: HttpServerConfig) {
       createShutdownRoute({
         onShutdown: () => {
           shutdownOAuth()
-          stopKlavisBackground()
-          klavisRef.handle?.close().catch((err) =>
-            logger.warn('Failed to close Klavis proxy transport', {
-              error: err instanceof Error ? err.message : String(err),
-            }),
-          )
-          remoteHermes?.close()
           onShutdown?.()
         },
       }),
@@ -160,23 +114,12 @@ export async function createHttpServer(config: HttpServerConfig) {
             c.json({ error: 'OAuth not available' }, 503),
           ),
     )
-    .route('/klavis', createKlavisRoutes({ browserosId: browserosId || '' }))
-    .route(
-      '/credits',
-      createCreditsRoutes({
-        browserosId,
-        gatewayBaseUrl: INLINED_ENV.BROWSEROS_CONFIG_URL
-          ? new URL(INLINED_ENV.BROWSEROS_CONFIG_URL).origin
-          : undefined,
-      }),
-    )
     .route(
       '/mcp',
       createMcpRoutes({
         version,
         browser,
         browserSession,
-        klavisRef,
         browserUseNewTools: config.browserUseNewTools,
       }),
     )
@@ -192,20 +135,14 @@ export async function createHttpServer(config: HttpServerConfig) {
         browser,
         browserSession,
         browserosId,
-        klavisRef,
         aiSdkDevtoolsEnabled: config.aiSdkDevtoolsEnabled,
         browserUseNewTools: config.browserUseNewTools,
         serverPort: port,
         resourcesDir,
-        remoteHermes,
       }),
     )
     .route('/screencast', createScreencastRoute({ browser }))
     .route('/agents', agentRoutes)
-    .route(
-      '/remote-hermes',
-      createRemoteHermesRoutes({ service: remoteHermes }),
-    )
 
   // Error handler
   app.onError((err, c) => {
@@ -220,12 +157,6 @@ export async function createHttpServer(config: HttpServerConfig) {
       })
       return c.json(error.toJSON(), error.statusCode as ContentfulStatusCode)
     }
-
-    Sentry.withScope((scope) => {
-      scope.setTag('route', c.req.path)
-      scope.setTag('method', c.req.method)
-      Sentry.captureException(error)
-    })
 
     logger.error('Unhandled Error', {
       message: error.message,

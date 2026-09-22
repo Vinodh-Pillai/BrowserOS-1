@@ -20,12 +20,11 @@ import { formatConversationHistory } from '@/lib/conversations/formatConversatio
 import { useConversations } from '@/lib/conversations/useConversations'
 import { declinedAppsStorage } from '@/lib/declined-apps/storage'
 import { resolveChatProvider } from '@/lib/llm-providers/provider-runtime'
-import { createDefaultBrowserOSProvider } from '@/lib/llm-providers/storage'
+import { createDefaultRamProvider } from '@/lib/llm-providers/storage'
 import type { ChatRequestBrowserContext } from '@/lib/messaging/server/buildChatRequestBody'
 import { track } from '@/lib/metrics/track'
 import { searchActionsStorage } from '@/lib/search-actions/searchActionsStorage'
 import { selectedTextStorage } from '@/lib/selected-text/selectedTextStorage'
-import { sentry } from '@/lib/sentry/sentry'
 import { stopAgentStorage } from '@/lib/stop-agent/stop-agent-storage'
 import { selectedWorkspaceStorage } from '@/lib/workspace/workspace-storage'
 import { useAgentServerUrl } from '@/modules/browseros/agent-server-url.hooks'
@@ -320,7 +319,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
             selectedLlmProviderRef.current
               ? [selectedLlmProviderRef.current]
               : [],
-          ) ?? createDefaultBrowserOSProvider()
+          ) ?? createDefaultRamProvider()
         const activeTabsList = await chrome.tabs.query({
           active: true,
           currentWindow: true,
@@ -691,15 +690,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
       adapter: target.kind === 'acp' ? target.adapter : undefined,
     })
 
-    void selectChatTarget(target).catch((error) => {
-      sentry.captureException(error, {
-        extra: {
-          message: 'Failed to persist sidepanel chat target selection',
-          targetId: target.id,
-          targetKind: target.kind,
-        },
-      })
-    })
+    void selectChatTarget(target).catch(() => {})
     if (target.kind === 'llm') setDefaultProvider(target.provider.id)
 
     if (

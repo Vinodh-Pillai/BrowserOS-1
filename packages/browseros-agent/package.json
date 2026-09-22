@@ -24,6 +24,8 @@
     "install:browseros-dogfood": "make -C tools/dogfood install",
     "test:env": "./tools/dev/run.sh test",
     "test:cleanup": "./tools/dev/run.sh cleanup --quick --yes",
+    "start:chrome": "powershell -ExecutionPolicy Bypass -NoProfile -File ./start-browseros.ps1 -NoWait",
+    "start:all": "powershell -ExecutionPolicy Bypass -NoProfile -File ./start-browseros.ps1",
     "start:server": "bun run --filter @browseros/server --elide-lines=0 start",
     "start:agent": "bun run --filter @browseros/agent dev",
     "build": "bun run build:server && bun run build:agent",

@@ -10,7 +10,6 @@ import {
 } from '@/lib/constants/analyticsEvents'
 import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import { track } from '@/lib/metrics/track'
-import { sentry } from '@/lib/sentry/sentry'
 import { useAddManagedServer } from '@/modules/mcp/add-managed-server.hooks'
 import { useGetMCPServersList } from '@/modules/mcp/managed-mcp-servers.hooks'
 import { useRemoveManagedServer } from '@/modules/mcp/remove-managed-server.hooks'
@@ -21,14 +20,12 @@ import { AddCustomMCPDialog } from './AddCustomMCPDialog'
 import { AddManagedMCPDialog } from './AddManagedMCPDialog'
 import { AvailableManagedServers } from './AvailableManagedServers'
 
-const failedToAddMcp = (serverName: string, e: unknown) => {
+const failedToAddMcp = (serverName: string) => {
   toast.error(`Failed to add app: ${serverName}`)
-  sentry.captureException(e)
 }
 
-const failedToRemoveMcp = (serverName: string, e: unknown) => {
+const failedToRemoveMcp = (serverName: string) => {
   toast.error(`Failed to remove app: ${serverName}`)
-  sentry.captureException(e)
 }
 
 /**
@@ -76,13 +73,13 @@ export const ConnectMCP: FC = () => {
       }
 
       if (!response.oauthUrl) {
-        failedToAddMcp(mcpName, 'No auth URL returned')
+        failedToAddMcp(mcpName)
         return
       }
 
       window.open(response.oauthUrl, '_blank')?.focus()
-    } catch (e) {
-      failedToAddMcp(mcpName, e)
+    } catch {
+      failedToAddMcp(mcpName)
     }
   }
 
@@ -99,7 +96,7 @@ export const ConnectMCP: FC = () => {
       })
 
       if (!response.apiKeyUrl && !response.oauthUrl) {
-        failedToAddMcp(name, 'No auth URL returned')
+        failedToAddMcp(name)
         return
       }
 
@@ -118,8 +115,8 @@ export const ConnectMCP: FC = () => {
       }
 
       window.open(response.oauthUrl, '_blank')?.focus()
-    } catch (e) {
-      failedToAddMcp(name, e)
+    } catch {
+      failedToAddMcp(name)
     }
   }
 
@@ -138,7 +135,6 @@ export const ConnectMCP: FC = () => {
       toast.error(
         `Failed to connect ${apiKeyServer.name}: ${e instanceof Error ? e.message : 'Unknown error'}`,
       )
-      sentry.captureException(e)
     }
   }
 
@@ -158,10 +154,10 @@ export const ConnectMCP: FC = () => {
         removeServer(id)
         mutateUserIntegrations()
       } else {
-        failedToRemoveMcp(name, 'Success not returned from server')
+        failedToRemoveMcp(name)
       }
-    } catch (e) {
-      failedToRemoveMcp(name, e)
+    } catch {
+      failedToRemoveMcp(name)
     } finally {
       setDeletingServerId(null)
     }

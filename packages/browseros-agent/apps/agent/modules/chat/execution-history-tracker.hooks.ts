@@ -9,7 +9,6 @@ import type {
   ExecutionTaskRecord,
   ExecutionTaskStatus,
 } from '@/lib/execution-history/types'
-import { sentry } from '@/lib/sentry/sentry'
 
 interface StartExecutionTaskInput {
   conversationId: string
@@ -75,15 +74,7 @@ export function useExecutionHistoryTracker() {
         await upsertConversationExecutionTask(task)
         lastSavedHashRef.current = taskHash
       })
-      .catch((error) => {
-        sentry.captureException(error, {
-          extra: {
-            message: 'Failed to persist execution history task',
-            conversationId: task.conversationId,
-            taskId: task.id,
-          },
-        })
-      })
+      .catch(() => {})
   }, [])
 
   const startTask = useCallback(

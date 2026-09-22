@@ -105,8 +105,7 @@ Runtime uses `.env.development`, while production artifact builds use `.env.prod
 | `BROWSEROS_EXTENSION_PORT` | 9300 | Legacy BrowserOS launch arg kept for compatibility |
 | `BROWSEROS_CONFIG_URL` | - | Remote config endpoint for rate limits |
 | `BROWSEROS_INSTALL_ID` | - | Unique installation identifier (analytics) |
-| `BROWSEROS_CLIENT_ID` | - | Client identifier (analytics) |
-| `POSTHOG_API_KEY` | - | Server-side PostHog API key |
+| `BROWSEROS_CLIENT_ID` | - | Client identifier |
 | `SENTRY_DSN` | - | Server-side Sentry DSN |
 | `BROWSEROS_TEST_HEADLESS` | false | Headless mode for server tests |
 
@@ -118,7 +117,6 @@ Copy from `apps/server/.env.production.example` before running `build:server`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BROWSEROS_CONFIG_URL` | - | Remote config endpoint baked into prod binary |
-| `POSTHOG_API_KEY` | - | PostHog key baked into prod binary |
 | `SENTRY_DSN` | - | Sentry DSN baked into prod binary |
 | `R2_ACCOUNT_ID` | - | Cloudflare account id for production artifact downloads/uploads |
 | `R2_ACCESS_KEY_ID` | - | Cloudflare R2 access key id |
@@ -136,7 +134,6 @@ Copy from `apps/server/.env.production.example` before running `build:server`.
 | `BROWSEROS_EXTENSION_PORT` | 9300 | Legacy BrowserOS CLI arg still passed for compatibility |
 | `BROWSEROS_BINARY` | - | Path to BrowserOS binary |
 | `USE_BROWSEROS_BINARY` | true | Use BrowserOS instead of default Chrome |
-| `VITE_PUBLIC_POSTHOG_KEY` | - | Agent UI PostHog key |
 | `VITE_PUBLIC_SENTRY_DSN` | - | Agent UI Sentry DSN |
 
 > **Note:** Port variables are duplicated in both files and must be kept in sync when running server and agent together.

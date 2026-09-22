@@ -15,7 +15,6 @@ import { createHttpServer } from './api/server'
 import { CdpBackend } from './browser/backends/cdp'
 import { Browser } from './browser/browser'
 import type { ServerConfig } from './config'
-import { INLINED_ENV } from './env'
 import {
   configureClaudeRuntime,
   configureCodexRuntime,
@@ -33,7 +32,7 @@ import { logger } from './lib/logger'
 import { reconcileUrl } from './lib/mcp-manager'
 import { metrics } from './lib/metrics'
 import { isPortInUseError } from './lib/port-binding'
-import { Sentry } from './lib/sentry'
+
 import { VERSION } from './version'
 
 export class Application {
@@ -183,7 +182,7 @@ export class Application {
     })
 
     if (!metrics.isEnabled()) {
-      logger.warn('Metrics disabled: missing POSTHOG_API_KEY')
+      logger.debug('Metrics disabled')
     } else if (
       !this.config.instanceClientId &&
       !this.config.instanceInstallId
@@ -198,19 +197,6 @@ export class Application {
           'instance.client_id / instance.install_id (config) to opt in.',
       )
     }
-
-    if (!INLINED_ENV.SENTRY_DSN) {
-      logger.debug('Sentry disabled: missing SENTRY_DSN')
-    }
-
-    Sentry.setUser({ id: browserosId })
-    Sentry.setContext('browseros', {
-      client_id: this.config.instanceClientId,
-      install_id: this.config.instanceInstallId,
-      browseros_version: this.config.instanceBrowserosVersion,
-      chromium_version: this.config.instanceChromiumVersion,
-      server_version: VERSION,
-    })
   }
 
   private configureLogDirectory(): void {
@@ -249,7 +235,6 @@ export class Application {
       process.exit(EXIT_CODES.PORT_CONFLICT)
     }
 
-    Sentry.captureException(error)
     process.exit(EXIT_CODES.GENERAL_ERROR)
   }
 

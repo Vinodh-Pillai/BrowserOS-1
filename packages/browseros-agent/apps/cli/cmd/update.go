@@ -38,8 +38,6 @@ func init() {
 
 			manager := update.NewManager(update.Options{
 				CurrentVersion: version,
-				JSONOutput:     jsonOut,
-				Debug:          debug,
 				Automatic:      false,
 			})
 			outcome, err := runUpdateCommand(

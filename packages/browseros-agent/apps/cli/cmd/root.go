@@ -201,16 +201,7 @@ func envBool(key string) bool {
 }
 
 func newAutomaticUpdateManager(args []string) *update.Manager {
-	if shouldSkipAutomaticUpdates(args) {
-		return nil
-	}
-
-	return update.NewManager(update.Options{
-		CurrentVersion: version,
-		JSONOutput:     requestedBoolFlag(args, "--json", jsonOut),
-		Debug:          requestedBoolFlag(args, "--debug", debug),
-		Automatic:      true,
-	})
+	return nil
 }
 
 func shouldSkipAutomaticUpdates(args []string) bool {
